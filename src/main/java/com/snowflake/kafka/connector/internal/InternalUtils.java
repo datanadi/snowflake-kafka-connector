@@ -48,7 +48,7 @@ public class InternalUtils {
    * @return size
    * @throws SQLException when failed to read result set
    */
-  static int resultSize(ResultSet resultSet) throws SQLException {
+  public static int resultSize(ResultSet resultSet) throws SQLException {
     int size = 0;
     while (resultSet.next()) {
       size++;
