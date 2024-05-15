@@ -5,7 +5,7 @@ import static com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig.ENABLE_
 import static com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig.SNOWFLAKE_ROLE;
 import static com.snowflake.kafka.connector.internal.streaming.StreamingUtils.STREAMING_BUFFER_COUNT_RECORDS_DEFAULT;
 import static com.snowflake.kafka.connector.internal.streaming.StreamingUtils.STREAMING_BUFFER_FLUSH_TIME_DEFAULT_SEC;
-import static com.snowflake.kafka.connector.internal.streaming.TopicPartitionChannel.NO_OFFSET_TOKEN_REGISTERED_IN_SNOWFLAKE;
+import static com.snowflake.kafka.connector.internal.streaming.channel.TopicPartitionChannel.NO_OFFSET_TOKEN_REGISTERED_IN_SNOWFLAKE;
 
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.annotations.VisibleForTesting;
@@ -18,6 +18,7 @@ import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
 import com.snowflake.kafka.connector.internal.SnowflakeErrors;
 import com.snowflake.kafka.connector.internal.SnowflakeSinkService;
 import com.snowflake.kafka.connector.internal.metrics.MetricsJmxReporter;
+import com.snowflake.kafka.connector.internal.streaming.channel.TopicPartitionChannel;
 import com.snowflake.kafka.connector.internal.telemetry.SnowflakeTelemetryService;
 import com.snowflake.kafka.connector.records.RecordService;
 import com.snowflake.kafka.connector.records.SnowflakeMetadataConfig;
@@ -45,7 +46,7 @@ import org.apache.kafka.connect.sink.SinkTaskContext;
  * <p>This implementation of SinkService uses Streaming Snowpipe (Streaming Ingestion)
  *
  * <p>Hence this initializes the channel, opens, closes. The StreamingIngestChannel resides inside
- * {@link TopicPartitionChannel} which is per partition.
+ * {@link BufferedTopicPartitionChannel} which is per partition.
  */
 public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
 
@@ -195,7 +196,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
    * Creates a table if it doesnt exist in Snowflake.
    *
    * <p>Initializes the Channel and partitionsToChannel map with new instance of {@link
-   * TopicPartitionChannel}
+   * BufferedTopicPartitionChannel}
    *
    * @param tableName destination table name
    * @param topicPartition TopicPartition passed from Kafka
@@ -212,7 +213,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
 
   /**
    * Initializes multiple Channels and partitionsToChannel maps with new instances of {@link
-   * TopicPartitionChannel}
+   * BufferedTopicPartitionChannel}
    *
    * @param partitions collection of topic partition
    * @param topic2Table map of topic to table name
@@ -245,7 +246,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
     // Create new instance of TopicPartitionChannel which will always open the channel.
     partitionsToChannel.put(
         partitionChannelKey,
-        new TopicPartitionChannel(
+        new BufferedTopicPartitionChannel(
             this.streamingIngestClient,
             topicPartition,
             partitionChannelKey, // Streaming channel name
@@ -289,7 +290,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
 
     // check all partitions to see if they need to be flushed based on time
     for (TopicPartitionChannel partitionChannel : partitionsToChannel.values()) {
-      // Time based flushing
+        // Time based flushing
       partitionChannel.insertBufferedRecordsIfFlushTimeThresholdReached();
     }
   }
@@ -317,7 +318,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
 
     TopicPartitionChannel channelPartition = partitionsToChannel.get(partitionChannelKey);
     boolean isFirstRowPerPartitionInBatch = channelsVisitedPerBatch.add(partitionChannelKey);
-    channelPartition.insertRecordToBuffer(record, isFirstRowPerPartitionInBatch);
+    channelPartition.insertRecord(record, isFirstRowPerPartitionInBatch);
   }
 
   @Override
@@ -326,7 +327,8 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
         partitionChannelKey(topicPartition.topic(), topicPartition.partition());
     if (partitionsToChannel.containsKey(partitionChannelKey)) {
       long offset = partitionsToChannel.get(partitionChannelKey).getOffsetSafeToCommitToKafka();
-      partitionsToChannel.get(partitionChannelKey).setLatestConsumerOffset(offset);
+        partitionsToChannel.get(partitionChannelKey).setLatestConsumerOffset(offset);
+
       return offset;
     } else {
       LOGGER.warn(
