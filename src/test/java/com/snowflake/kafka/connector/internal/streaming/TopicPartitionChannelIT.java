@@ -90,7 +90,7 @@ public class TopicPartitionChannelIT {
 
     // Ctor of TopicPartitionChannel tries to open the channel.
     TopicPartitionChannel channel =
-        new BufferedTopicPartitionChannel(
+        new DirectTopicPartitionChannel(
             snowflakeSinkServiceV2.getStreamingIngestClient(),
             topicPartition,
             testChannelName,
@@ -567,7 +567,7 @@ public class TopicPartitionChannelIT {
     // create a channel with new format and ingest few rows
     // Ctor of TopicPartitionChannel tries to open the channel (new format) for same partition
     TopicPartitionChannel topicPartitionChannelForFormatV2 =
-        new BufferedTopicPartitionChannel(
+        new DirectTopicPartitionChannel(
             ((SnowflakeSinkServiceV2) service).getStreamingIngestClient(),
             topicPartition,
             channelNameFormatV2,
@@ -659,7 +659,7 @@ public class TopicPartitionChannelIT {
     // create a channel with new format and dont ingest anything
     // Ctor of TopicPartitionChannel tries to open the channel (new format) for same partition
     TopicPartitionChannel topicPartitionChannelForFormatV2 =
-        new BufferedTopicPartitionChannel(
+        new DirectTopicPartitionChannel(
             ((SnowflakeSinkServiceV2) service).getStreamingIngestClient(),
             topicPartition,
             channelNameFormatV2,
